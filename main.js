@@ -105,6 +105,8 @@ export class Main extends Scene {
                 ambient: 0.4, diffusivity: 1.0, specularity: 0.1,
                 texture: new Texture("assets/stone.png", "LINEAR_MIPMAP_LINEAR")
             }),
+            sky_day: color(124/255, 173/255, 255/255, 1),
+            sky_night: color(0, 0, 0, 1),
         };
 
         this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
@@ -115,7 +117,7 @@ export class Main extends Scene {
         this.Chunk_Manager.add_chunk(1, 0);
         this.Chunk_Manager.add_chunk(1, 1);
 
-        console.log(this.shapes.cube);
+        // console.log(this.shapes.cube);
     }
 
     make_control_panel() {
@@ -156,21 +158,24 @@ export class Main extends Scene {
     display(context, program_state) {
         // grab gl pointer to handle sky color
         const gl = context.context;
-        gl.clearColor.apply(gl, hex_color("#7CADFF", 1));
 
         if (!context.scratchpad.controls) {
             this.children.push(context.scratchpad.controls = new CustomMovementControls());
             let [x_initial, y_initial, z_initial] = this.set_camera_above_block();
             program_state.set_camera(Mat4.translation(x_initial, y_initial, z_initial));
             program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 1, 256);
+            program_state.lights = [new Light(vec4(0, 20, 0, 1), color(1, 1, 1, 1), 10000)];
         }
-
-        const light_position = vec4(0, 20, 0, 1);
-        program_state.lights = [new Light(light_position, color(1, 1, 1, 1), 10000)];
 
         let model_transform;
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
 
+        // handle sky
+        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;
+        const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);
+        gl.clearColor.apply(gl, sky_color);
+
+        // draw blocks
         for (const c of this.Chunk_Manager.chunks.values()) {
             for (const coord of c.coords) {
                 model_transform = Mat4.identity().times(Mat4.translation(coord.x,coord.y,coord.z));
