@@ -119,16 +119,15 @@ class Chunk {
         (this.blocks = []).length = 16384;
         for (let x = 0; x < 32; x++) {
             for (let z = 0; z < 32; z++) {
-                // convert spot in chunk ==> world spot
-                const px = this.x + x / 32.0;
+                const px = this.x + x / 32.0;                           // convert spot in chunk ==> world spot
                 const pz = this.z + z / 32.0;
-                // generate y (map [-1,1] ==> [0,15])
-                const y = Math.floor((perlin.get(px,pz) + 1) * 7.5);
-                let idx = y + (z << 5) + (x << 10);
+
+                const y = Math.floor((perlin.get(px,pz) + 1) * 7.5);    // generate y & map [-1,1] ==> [0,15]
+                let idx = y + (z << 4) + (x << 9);                      // convert from (x,y,z) ==> idx
                 this.blocks[idx] = 1;
-                // fill in blocks below surface as stone
-                for (let i = 0; i < y; i++) {
-                    idx = i + (z << 5) + (x << 10);
+                
+                for (let i = 0; i < y; i++) {                           // fill in blocks below surface as stone
+                    idx = i + (z << 4) + (x << 9);
                     this.blocks[idx] = 2;
                 }
             }
@@ -139,14 +138,15 @@ class Chunk {
     update_mesh() {
         this.coords = [];
         for (let i = 0; i < this.blocks.length; i++) {
-            // cur block exists, check if any neighbors are air or if boundary
-            if (this.blocks[i] != null) {
+            if (this.blocks[i] != null) {                   // cur block exists, check if neighbors are air or boundary
                 let pos = i;
-                const y = pos % 16; pos -= y; pos >>= 5;
+                const y = pos % 16; pos -= y; pos >>= 4;    // convert from idx ==> (x,y,z)
                 const z = (pos % 32); pos -= z; pos >>= 5;
                 const x = (pos % 32);
-                // display chunk boundaries always
-                if (x == 0 || x == 31 || z == 0 || z == 31 || y == 0 || y == 15) {
+
+                if (x == 0 || x == 31 ||                    // always display chunk boundaries
+                    z == 0 || z == 31 ||
+                    y == 0 || y == 15) {
                     this.coords.push({
                         x: x + this.x * 32,
                         y: y,
@@ -154,20 +154,19 @@ class Chunk {
                         t: this.blocks[i],
                     });
                 }
-                // if internal block then check for air on any face
-                else {
+                else {                                      // if internal block then check for air on any face
                     const d = this.blocks[i-1];
                     const u = this.blocks[i+1];
-                    const l = this.blocks[i-1024];
-                    const r = this.blocks[i+1024];
-                    const b = this.blocks[i-32];
-                    const f = this.blocks[i+32];
+                    const l = this.blocks[i-512];
+                    const r = this.blocks[i+512];
+                    const b = this.blocks[i-16];
+                    const f = this.blocks[i+16];
                     if (d == null || u == null || l == null || r == null || b == null || f == null) {
                         this.coords.push({
-                            x: x + this.x * 32,
+                            x: x + this.x * 32,             // x,y,z coords
                             y: y,
                             z: z + this.z * 32,
-                            t: this.blocks[i],
+                            t: this.blocks[i],              // block type
                         });
                     }
                 }
