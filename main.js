@@ -139,20 +139,35 @@ export class Main extends Scene {
     }
     
     find_starting_block_position() {
-        let highestPoint = vec3(0, -Infinity, 0); // Initialize with a very low Y value
-    
-        // Loop through each chunk
-        for (const chunk of this.Chunk_Manager.chunks.values()) {
-            // Loop through each block in the chunk
-            for (const block of chunk.coords) {
-                // Check if this block is higher than the current highest
-                if (block.y > highestPoint[1]) {
-                    highestPoint = vec3(block.x, block.y, block.z);
-                }
-            }
+         // Access Chunk 0,0
+    const chunk = this.Chunk_Manager.chunks.get("0,0");
+
+    // Base index for position (31, y, 31)
+    const baseIndex = 31 * 512 + 31 * 16;
+
+    // Initialize the highest block's y-coordinate
+    let highestY = -1;
+
+    // Iterate over y-coordinates from 0 to 15
+    for (let y = 0; y <= 15; y++) {
+        // Calculate the index in the blocks array
+        let index = baseIndex + y;
+
+        // Check if the block at this index is not null
+        if (chunk.blocks[index] !== null) {
+            // Update the highest y-coordinate
+            highestY = y;
         }
-    
-        return highestPoint;
+    }
+
+    // If no valid block is found, return a default position
+    if (highestY === -1) {
+        // Return a default position if needed
+        return [-31, 0, -31]; // Example default position
+    }
+
+    // Return the coordinates of the highest block
+    return [-31, -highestY - 5, -31];
     }
     
 
