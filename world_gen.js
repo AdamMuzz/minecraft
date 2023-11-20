@@ -107,7 +107,7 @@ class Chunk {
         this.x = x;
         this.z = z;
         this.blocks;
-        this.coords = [];
+        this.coords;
         this.generate(perlin);
         this.update_mesh();
     }
