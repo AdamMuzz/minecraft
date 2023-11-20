@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="En">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Tiny Graphics</title>
+</head>
+<body>
+<canvas id='cnvs'></canvas>
+<canvas id='cnvs2'></canvas>
+<script type="module">
+    import {Perlin_Noise, Improved_Perlin_Noise, Chunk} from './world_gen.js';
+
+    let cnvs = document.getElementById('cnvs');
+    let cnvs2 = document.getElementById('cnvs2');
+    cnvs.width = cnvs.height = 512;
+    cnvs2.width = cnvs2.height = 512;
+    let ctx = cnvs.getContext('2d');
+    let ctx2 = cnvs2.getContext('2d');
+
+    const GRID_SIZE = 4;
+    const RESOLUTION = 128;
+    const COLOR_SCALE = 255;
+
+    let pixel_size = cnvs.width / RESOLUTION;
+    let num_pixels = GRID_SIZE / RESOLUTION;
+    let start, end;
+
+    const perlin = new Perlin_Noise();
+    const improved_perlin = new Improved_Perlin_Noise();
+
+    // start = Date.now();
+    // for (let y = 0; y < GRID_SIZE; y += num_pixels / GRID_SIZE){
+    //     for (let x = 0; x < GRID_SIZE; x += num_pixels / GRID_SIZE){
+    //         let v = parseInt(perlin.get(x, y) * COLOR_SCALE);
+    //         ctx.fillStyle = 'hsl('+v+',50%,50%)';
+    //         ctx.fillRect(
+    //             x / GRID_SIZE * cnvs.width,
+    //             y / GRID_SIZE * cnvs.width,
+    //             pixel_size,
+    //             pixel_size
+    //         );
+    //     }
+    // }
+    // end = Date.now();
+    // console.log((end-start)/1000);
+
+    start = Date.now();
+    for (let y = 0; y < GRID_SIZE; y += num_pixels / GRID_SIZE){
+        for (let x = 0; x < GRID_SIZE; x += num_pixels / GRID_SIZE){
+            const v = (improved_perlin.get(x,y) + 1) * 127.5;
+            ctx2.fillStyle = `rgb(${v},${v},${v})`;
+            ctx2.fillRect(
+                x / GRID_SIZE * cnvs.width,
+                y / GRID_SIZE * cnvs.width,
+                pixel_size,
+                pixel_size
+            );
+        }
+    }
+    end = Date.now();
+    console.log((end-start)/1000);
+
+    const test = new Chunk(0,0, improved_perlin);
+</script>
+</body>
+</html>
