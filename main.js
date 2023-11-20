@@ -48,6 +48,39 @@ class Cube extends Shape {
     }
 }
 
+class CustomMovementControls extends defs.Movement_Controls {
+    constructor() {
+        super();
+        // Disable rolling by default
+        this.roll = 0;
+
+        // Unfreeze mouse look around by default
+        this.look_around_locked = false; // Set to false to allow looking around
+    }
+
+    // Override the display method to modify behavior
+    display(context, graphics_state, dt = graphics_state.animation_delta_time / 1000) {
+        // Prevent rolling left or right
+        this.roll = 0;
+
+        // Call the super class display method
+        super.display(context, graphics_state, dt);
+    }
+
+    // Override the first_person_flyaround method to restrict up/down movement
+    first_person_flyaround(radians_per_frame, meters_per_frame, leeway = 70) {
+        // Prevent moving up and down
+        this.thrust[1] = 0;
+
+        this.mouse.from_center[1] = Math.max(Math.min(this.mouse.from_center[1], leeway/2), -leeway/2);
+
+
+        // Call the super class method
+        super.first_person_flyaround(radians_per_frame, meters_per_frame, leeway);
+    }
+
+}
+
 export class Main extends Scene {
     constructor() {
         super();
@@ -93,14 +126,42 @@ export class Main extends Scene {
         });
     }
 
+    set_camera_above_block() {
+        // Find a suitable block's position
+        let blockPosition = this.find_starting_block_position();
+        let cameraHeightAboveBlock = 10; // Adjust as needed
+    
+        // Return the calculated camera position
+        return [blockPosition[0], blockPosition[1] + cameraHeightAboveBlock, blockPosition[2]];
+    }
+    
+    find_starting_block_position() {
+        let highestPoint = vec3(0, -Infinity, 0); // Initialize with a very low Y value
+    
+        // Loop through each chunk
+        for (const chunk of this.Chunk_Manager.chunks.values()) {
+            // Loop through each block in the chunk
+            for (const block of chunk.coords) {
+                // Check if this block is higher than the current highest
+                if (block.y > highestPoint[1]) {
+                    highestPoint = vec3(block.x, block.y, block.z);
+                }
+            }
+        }
+    
+        return highestPoint;
+    }
+    
+
     display(context, program_state) {
         // grab gl pointer to handle sky color
         const gl = context.context;
         gl.clearColor.apply(gl, hex_color("#7CADFF", 1));
 
         if (!context.scratchpad.controls) {
-            this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
-            program_state.set_camera(Mat4.translation(-20, -20, -100));
+            this.children.push(context.scratchpad.controls = new CustomMovementControls());
+            let [x_initial, y_initial, z_initial] = this.set_camera_above_block();
+            program_state.set_camera(Mat4.translation(x_initial, y_initial, z_initial));
             program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 1, 256);
         }
 
