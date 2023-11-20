@@ -138,13 +138,13 @@ class Chunk {
     update_mesh() {
         this.coords = [];
         for (let i = 0; i < this.blocks.length; i++) {
-            if (this.blocks[i] != null) {                               // cur block exists, check if neighbors are air or boundary
+            if (this.blocks[i] != null) {                   // cur block exists, check if neighbors are air or boundary
                 let pos = i;
-                const y = pos % 16; pos -= y; pos >>= 4;                // convert from idx ==> (x,y,z)
+                const y = pos % 16; pos -= y; pos >>= 4;    // convert from idx ==> (x,y,z)
                 const z = (pos % 32); pos -= z; pos >>= 5;
                 const x = (pos % 32);
 
-                if (x == 0 || x == 31 ||                                // always display chunk boundaries
+                if (x == 0 || x == 31 ||                    // always display chunk boundaries
                     z == 0 || z == 31 ||
                     y == 0 || y == 15) {
                     this.coords.push({
@@ -154,7 +154,7 @@ class Chunk {
                         t: this.blocks[i],
                     });
                 }
-                else {                                                  // if internal block then check for air on any face
+                else {                                      // if internal block then check for air on any face
                     const d = this.blocks[i-1];
                     const u = this.blocks[i+1];
                     const l = this.blocks[i-512];
@@ -163,10 +163,10 @@ class Chunk {
                     const f = this.blocks[i+16];
                     if (d == null || u == null || l == null || r == null || b == null || f == null) {
                         this.coords.push({
-                            x: x + this.x * 32,
+                            x: x + this.x * 32,             // x,y,z coords
                             y: y,
                             z: z + this.z * 32,
-                            t: this.blocks[i],
+                            t: this.blocks[i],              // block type
                         });
                     }
                 }

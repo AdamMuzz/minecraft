@@ -88,10 +88,11 @@ export class Main extends Scene {
     }
 
     make_control_panel() {
+        // press t to regenerate the world
         this.key_triggered_button("new terrain", ["t"], () => {
-            this.perlin.seed();
-            this.Chunk_Manager.generate_chunks();
-            this.Chunk_Manager.update_chunk_meshes();
+            this.perlin.seed();                         // randomly create new perlin permutation
+            this.Chunk_Manager.generate_chunks();       // regenerate world w/ new noise map
+            this.Chunk_Manager.update_chunk_meshes();   // update surface area mesh
         });
     }
 
@@ -99,6 +100,7 @@ export class Main extends Scene {
         // grab gl pointer to handle sky color
         const gl = context.context;
 
+        // create initial camera & lights on first frame
         if (!context.scratchpad.controls) {
             this.children.push(context.scratchpad.controls = new defs.Movement_Controls());
             program_state.set_camera(Mat4.translation(-20, -20, -100));
@@ -110,8 +112,8 @@ export class Main extends Scene {
         const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
 
         // handle sky
-        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;
-        const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);
+        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                      // 60s cycle between [0,1]
+        const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);   // lin interp between night/day
         gl.clearColor.apply(gl, sky_color);
 
         // draw blocks
