@@ -56,7 +56,27 @@ class CustomMovementControls extends defs.Movement_Controls {
 
         // Unfreeze mouse look around by default
         this.look_around_locked = false; // Set to false to allow looking around
-        this.speed_multiplier = 0.4;
+        this.speed_multiplier = 0.25;  // Normal speed
+        this.sprint_speed_multiplier = 0.7;  // Sprinting speed
+
+        // Add key event listeners for sprinting
+        this.enable_sprinting();
+    }
+
+    enable_sprinting() {
+        // Handle keydown event for Shift key
+        document.addEventListener('keydown', (event) => {
+            if (event.shiftKey) {
+                this.speed_multiplier = this.sprint_speed_multiplier;
+            }
+        });
+
+        // Handle keyup event for Shift key
+        document.addEventListener('keyup', (event) => {
+            if (event.key === 'Shift') {
+                this.speed_multiplier = 0.25;  // Reset to normal speed
+            }
+        });
     }
 
     // Override the display method to modify behavior
@@ -99,6 +119,7 @@ class CustomMovementControls extends defs.Movement_Controls {
         this.key_triggered_button("Left", ["a"], () => this.thrust[0] = 1, undefined, () => this.thrust[0] = 0);
         this.key_triggered_button("Back", ["s"], () => this.thrust[2] = -1, undefined, () => this.thrust[2] = 0);
         this.key_triggered_button("Right", ["d"], () => this.thrust[0] = -1, undefined, () => this.thrust[0] = 0);
+        this.key_triggered_button("Sprint", ["Shift"], () => this.toggle_sprint(), "#8B8885");
         this.new_line();
     }
 
