@@ -81,11 +81,10 @@ export class Main extends Scene {
         this.perlin = new Perlin_Noise();
         this.Chunk_Manager = new Chunk_Manager(this.perlin);
         this.Chunk_Manager.add_chunk(0, 0);
-        this.Chunk_Manager.add_chunk(0, 1);
-        this.Chunk_Manager.add_chunk(1, 0);
-        this.Chunk_Manager.add_chunk(1, 1);
+        // this.Chunk_Manager.add_chunk(0, 1);
+        // this.Chunk_Manager.add_chunk(1, 0);
+        // this.Chunk_Manager.add_chunk(1, 1);
 
-        // console.log(this.shapes.cube);
     }
 
     make_control_panel() {
@@ -95,13 +94,27 @@ export class Main extends Scene {
             this.Chunk_Manager.generate_chunks();       // regenerate world w/ new noise map
             this.Chunk_Manager.update_chunk_meshes();   // update surface area mesh
         });
+
+        this.new_line(); this.new_line();
+
+        // create input controls
+        this.control_panel.innerHTML += "write coordinate as 'x y z' <br>";
+        const xyz_input = this.control_panel.appendChild(document.createElement("input"));
+        this.new_line();
+        xyz_input.setAttribute("type", "text");
+        xyz_input.setAttribute("placeholder", "x y z");
+        this.key_triggered_button("place block", ["p"], () => {
+            console.log("place");
+            console.log(xyz_input.value);
+        });
+        this.key_triggered_button("delete block", ["o"], () => {
+            console.log("delete");
+        });
     }
 
-    set_camera_above_block() {
-        let blockPosition = this.find_starting_block_position();    // Find a suitable block's position
-        let cameraHeightAboveBlock = 10;                            // Adjust as needed
-    
-        return [blockPosition[0], blockPosition[1] + cameraHeightAboveBlock, blockPosition[2]];
+    set_camera_above_block(delta) {
+        let blockPosition = this.find_starting_block_position();
+        return [blockPosition[0], blockPosition[1] + delta, blockPosition[2]];
     }
     
     find_starting_block_position() {
@@ -110,16 +123,18 @@ export class Main extends Scene {
         let highestY = -1;                                  // Initialize the highest block's y-coordinate
 
         for (let y = 0; y <= 15; y++) {                     // Iterate over y-coordinates from 0 to 15
-            if (chunk.blocks[baseIndex + y] !== null) {     // Check if the block at this index is not null
+            if (chunk.blocks[baseIndex + y] != null) {      // Check if the block at this index is not null
                 highestY = y;                               // Update the highest y-coordinate
             }
         }
+
+        console.log(highestY);
 
         if (highestY === -1) {                              // If no valid block is found, return a default position
             return [-31, 0, -31];                           // Return a default position if needed
         }
 
-        return [-31, -highestY - 5, -31];                   // Return the coordinates of the highest block
+        return [-31, -highestY, -31];                       // Return the coordinates of the highest block
     }
 
     display(context, program_state) {
@@ -128,8 +143,8 @@ export class Main extends Scene {
 
         // on first frame...
         if (!context.scratchpad.controls) {
-            this.children.push(context.scratchpad.controls = new CustomMovementControls());     // movement controls
-            let [x_initial, y_initial, z_initial] = this.set_camera_above_block();              // set player pos
+            this.children.push(context.scratchpad.controls = new defs.Movement_Controls);
+            const [x_initial, y_initial, z_initial] = this.set_camera_above_block(-10);         // set player pos
             program_state.set_camera(Mat4.translation(x_initial, y_initial, z_initial));
             program_state.projection_transform = Mat4.perspective(                              // set camera as perspective
                 Math.PI / 4, 
@@ -144,7 +159,7 @@ export class Main extends Scene {
         // handle sky
         const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                      // 60s cycle between [0,1]
         const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);   // lin interp between night/day
-        gl.clearColor.apply(gl, sky_color);
+        gl.clearColor.apply(gl, sky_color);                                                 // set background draw color
 
         // draw blocks
         for (const c of this.Chunk_Manager.chunks.values()) {
