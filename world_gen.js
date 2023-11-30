@@ -173,6 +173,16 @@ class Chunk {
             }
         }
     }
+
+    place_block(x, y, z) {
+        const idx = y + (z << 4) + (x << 9); // convert from (x,y,z) ==> idx
+        if (this.blocks[idx] == undefined) {
+            this.blocks[idx] = 2;
+            this.update_mesh();
+        }
+        else
+            console.log("block already exists at coordinate");
+    }
 }
 
 // manager to handle the world's chunks
@@ -197,5 +207,16 @@ export class Chunk_Manager {
         for (const c of this.chunks.values()) {
             c.update_mesh();
         }
+    }
+
+    place_block(x, y, z) {
+        const c = `${Math.floor(x / 32)},${Math.floor(z / 32)}`;    // parse chunk coords
+        const chunk_x = x % 32;                                     // parse intra chunk coords
+        const chunk_z = z % 32;
+        const chunk = this.chunks.get(c);
+        if (chunk == undefined || y > 15 || y < 0)                  // ensure chunk exists at coords
+            console.log("no chunk exists for given coordinates");
+        else
+            chunk.place_block(chunk_x, y, chunk_z);
     }
 }

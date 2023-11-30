@@ -103,10 +103,16 @@ export class Main extends Scene {
         this.new_line();
         xyz_input.setAttribute("type", "text");
         xyz_input.setAttribute("placeholder", "x y z");
+        // handle placing block
         this.key_triggered_button("place block", ["p"], () => {
-            console.log("place");
-            console.log(xyz_input.value);
+            const coords = xyz_input.value.split(" ").map(x => parseInt(x));
+            if (coords.length == 3) {
+                this.Chunk_Manager.place_block(...coords);
+                return;
+            }
+            console.log("incorrect coordinates dimensions");
         });
+        // handle deleting block
         this.key_triggered_button("delete block", ["o"], () => {
             console.log("delete");
         });
@@ -127,8 +133,6 @@ export class Main extends Scene {
                 highestY = y;                               // Update the highest y-coordinate
             }
         }
-
-        console.log(highestY);
 
         if (highestY === -1) {                              // If no valid block is found, return a default position
             return [-31, 0, -31];                           // Return a default position if needed
