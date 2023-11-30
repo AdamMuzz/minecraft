@@ -114,7 +114,12 @@ export class Main extends Scene {
         });
         // handle deleting block
         this.key_triggered_button("delete block", ["o"], () => {
-            console.log("delete");
+            const coords = xyz_input.value.split(" ").map(x => parseInt(x));
+            if (coords.length == 3) {
+                this.Chunk_Manager.delete_block(...coords);
+                return;
+            }
+            console.log("incorrect coordinates dimensions");
         });
     }
 
