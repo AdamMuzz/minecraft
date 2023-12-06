@@ -77,7 +77,7 @@ export class Main extends Scene {
             sky_night: color(0, 0, 0, 1),
         };
 
-        this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
+        this.program_state;
         this.perlin = new Perlin_Noise();
         this.Chunk_Manager = new Chunk_Manager(this.perlin);
         this.Chunk_Manager.add_chunk(0, 0);
@@ -90,9 +90,10 @@ export class Main extends Scene {
     make_control_panel() {
         // press t to regenerate the world
         this.key_triggered_button("new terrain", ["t"], () => {
-            this.perlin.seed();                         // randomly create new perlin permutation
-            this.Chunk_Manager.generate_chunks();       // regenerate world w/ new noise map
-            this.Chunk_Manager.update_chunk_meshes();   // update surface area mesh
+            this.perlin.seed();                                                             // randomly create new perlin permutation
+            this.Chunk_Manager.generate_chunks();                                           // regenerate world w/ new noise map
+            this.Chunk_Manager.update_chunk_meshes();                                       // update surface area mesh
+            this.program_state.set_camera(Mat4.translation(...this.get_spawn_point(2)));    // reset player position
         });
 
         this.new_line(); this.new_line();
@@ -123,29 +124,21 @@ export class Main extends Scene {
         });
     }
 
-    set_camera_above_block(delta) {
-        let blockPosition = this.find_starting_block_position();
-        return [blockPosition[0], blockPosition[1] + delta, blockPosition[2]];
-    }
-    
-    find_starting_block_position() {
+    // spawn the player at (31, y*, 31) where y* is the top most block at x,z = 31 plus an optional height delta
+    // note camera needs inverse coords so need to make everything negative
+    get_spawn_point(delta = 0) {
         const chunk = this.Chunk_Manager.chunks.get("0,0"); // Access Chunk 0,0
         const baseIndex = 16368;                            // Base index for position (31, y, 31)
-        let highestY = -1;                                  // Initialize the highest block's y-coordinate
+        let highest_y;                                      // Initialize the highest block's y-coordinate
 
-        for (let y = 0; y <= 15; y++) {                     // Iterate over y-coordinates from 0 to 15
-            if (chunk.blocks[baseIndex + y] != null) {      // Check if the block at this index is not null
-                highestY = y;                               // Update the highest y-coordinate
-            }
-        }
+        for (let y = 0; y < 16; y++)                        // Iterate over y-coordinates from 0 to 15
+            if (chunk.blocks[baseIndex + y] != null)        // Check if the block at this index is not null
+                highest_y = y;                              // Update the highest y-coordinate
 
-        if (highestY === -1) {                              // If no valid block is found, return a default position
-            return [-31, 0, -31];                           // Return a default position if needed
-        }
-
-        return [-31, -highestY, -31];                       // Return the coordinates of the highest block
+        return [-31, -highest_y - delta, -31];              // Return the coordinates of the highest block
     }
 
+    // called every frame by webGL manager to render the scene
     display(context, program_state) {
         // grab gl pointer to handle sky color
         const gl = context.context;
@@ -153,8 +146,8 @@ export class Main extends Scene {
         // on first frame...
         if (!context.scratchpad.controls) {
             this.children.push(context.scratchpad.controls = new defs.Movement_Controls);
-            const [x_initial, y_initial, z_initial] = this.set_camera_above_block(-10);         // set player pos
-            program_state.set_camera(Mat4.translation(x_initial, y_initial, z_initial));
+            this.program_state = program_state;                                                 // store ref to program state
+            program_state.set_camera(Mat4.translation(...this.get_spawn_point(2)));             // set player position
             program_state.projection_transform = Mat4.perspective(                              // set camera as perspective
                 Math.PI / 4, 
                 context.width / context.height, 
@@ -180,5 +173,10 @@ export class Main extends Scene {
                     this.shapes.cube.draw(context, program_state, model_transform, this.materials.stone);
             }
         }
+
+        // draw spawn point
+        // const [x, y, z] = this.get_spawn_point(1);
+        // model_transform = Mat4.identity().times(Mat4.translation(-x, -y, -z));
+        // this.shapes.cube.draw(context, program_state, model_transform, this.materials.phong);
     }
 }

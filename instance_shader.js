@@ -1,6 +1,8 @@
 import { tiny } from './tiny-graphics';
 const { Graphics_Card_Object, Graphics_Addresses } = tiny;
 
+// https://webglfundamentals.org/webgl/lessons/webgl-instanced-drawing.html
+
 class Instance_Shader extends Graphics_Card_Object {
     constructor(num_lights = 2) {
         super();
