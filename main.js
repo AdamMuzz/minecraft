@@ -166,7 +166,8 @@ export class Main extends Scene {
         // draw blocks
         for (const c of this.Chunk_Manager.chunks.values()) {
             for (const coord of c.coords) {
-                model_transform = Mat4.identity().times(Mat4.translation(coord.x,coord.y,coord.z));
+                // model_transform = Mat4.identity().times(Mat4.translation(coord.x,coord.y,coord.z));
+                model_transform = Mat4.translation(coord.x,coord.y,coord.z);
                 if (coord.t == 1)
                     this.shapes.cube.draw(context, program_state, model_transform, this.materials.grass);
                 if (coord.t == 2)
@@ -176,7 +177,7 @@ export class Main extends Scene {
 
         // draw spawn point
         // const [x, y, z] = this.get_spawn_point(1);
-        // model_transform = Mat4.identity().times(Mat4.translation(-x, -y, -z));
+        // model_transform = Mat4.translation(-x, -y, -z);
         // this.shapes.cube.draw(context, program_state, model_transform, this.materials.phong);
     }
 }
