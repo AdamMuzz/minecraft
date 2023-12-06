@@ -81,9 +81,9 @@ export class Main extends Scene {
         this.perlin = new Perlin_Noise();
         this.Chunk_Manager = new Chunk_Manager(this.perlin);
         this.Chunk_Manager.add_chunk(0, 0);
-        // this.Chunk_Manager.add_chunk(0, 1);
-        // this.Chunk_Manager.add_chunk(1, 0);
-        // this.Chunk_Manager.add_chunk(1, 1);
+        this.Chunk_Manager.add_chunk(0, 1);
+        this.Chunk_Manager.add_chunk(1, 0);
+        this.Chunk_Manager.add_chunk(1, 1);
 
     }
 
@@ -140,8 +140,6 @@ export class Main extends Scene {
 
     // called every frame by webGL manager to render the scene
     display(context, program_state) {
-        // grab gl pointer to handle sky color
-        const gl = context.context;
 
         // on first frame...
         if (!context.scratchpad.controls) {
@@ -155,18 +153,20 @@ export class Main extends Scene {
             program_state.lights = [new Light(vec4(0, 20, 0, 1), color(1, 1, 1, 1), 10000)];    // create lights
         }
 
-        let model_transform;
-        const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
+        // frame constants
+        const gl = context.context;                                                             // grab gl pointer to handle sky color
+        let model_transform;                                                                    // reuse for block renders
+        const t = program_state.animation_time / 1000;                                          // time units
+        const dt = program_state.animation_delta_time / 1000;
 
         // handle sky
-        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                      // 60s cycle between [0,1]
-        const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);   // lin interp between night/day
-        gl.clearColor.apply(gl, sky_color);                                                 // set background draw color
+        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                          // 60s cycle between [0,1]
+        const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);       // lin interp between night/day
+        gl.clearColor.apply(gl, sky_color);                                                     // set background draw color
 
         // draw blocks
         for (const c of this.Chunk_Manager.chunks.values()) {
             for (const coord of c.coords) {
-                // model_transform = Mat4.identity().times(Mat4.translation(coord.x,coord.y,coord.z));
                 model_transform = Mat4.translation(coord.x,coord.y,coord.z);
                 if (coord.t == 1)
                     this.shapes.cube.draw(context, program_state, model_transform, this.materials.grass);
