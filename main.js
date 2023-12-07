@@ -78,6 +78,9 @@ export class Main extends Scene {
         };
 
         this.program_state;
+        this.camera_x;
+        this.camera_z;
+
         this.perlin = new Perlin_Noise();
         this.Chunk_Manager = new Chunk_Manager(this.perlin);
         this.Chunk_Manager.add_chunk(0, 0);
@@ -93,7 +96,7 @@ export class Main extends Scene {
             this.perlin.seed();                                                             // randomly create new perlin permutation
             this.Chunk_Manager.generate_chunks();                                           // regenerate world w/ new noise map
             this.Chunk_Manager.update_chunk_meshes();                                       // update surface area mesh
-            this.program_state.set_camera(Mat4.translation(...this.get_spawn_point(2)));    // reset player position
+            this.program_state.set_camera(Mat4.translation(...this.get_coordinates(2, this.camera_x, this.camera_z)));    // set position
         });
 
         this.new_line(); this.new_line();
@@ -126,16 +129,52 @@ export class Main extends Scene {
 
     // spawn the player at (31, y*, 31) where y* is the top most block at x,z = 31 plus an optional height delta
     // note camera needs inverse coords so need to make everything negative
-    get_spawn_point(delta = 0) {
-        const chunk = this.Chunk_Manager.chunks.get("0,0"); // Access Chunk 0,0
-        const baseIndex = 16368;                            // Base index for position (31, y, 31)
+    get_coordinates(delta = 0, x = 31, z = 31) {
+
+        // chunk bounds: 0 < x < 64, 0 < z < 64
+
+        // find which chunk to traverse
+        let chunk_x = Math.floor(x/32);
+        let chunk_z = Math.floor(z/32);
+
+        // convert actual coordinate to chunk indices
+        let i_x = Math.floor(x % 32);
+        let i_z = Math.floor(z % 32);
+
+        // if camera coordinates are out of bounds (for error prevention in chunk out-of-bounds access)
+        if (x <= 0) {
+            chunk_x = 0;
+            i_x = 0;
+        }
+        if (z <= 0) {
+            chunk_z = 0;
+            i_z = 0;
+        }
+        if (x >= 64) {
+            chunk_x = 1;
+            i_x = 31;
+        }
+        if (z >= 64) {
+            chunk_z = 1;
+            i_z = 31;
+        }
+        // console.log("chunk:", chunk_coords, ", i_x, i_z:", i_x, i_z);
+
+        // chunk coordinates
+        const chunk_coords = chunk_x.toString() + ',' + chunk_z.toString();
+        
+        const chunk = this.Chunk_Manager.chunks.get(chunk_coords); // Access Chunk 0,0
+        
+        // calculate index given indices
+        const baseIndex = i_x * (32*16) + i_z * 16;                 // Base index for position (i_x, _, i_z)
+
         let highest_y;                                      // Initialize the highest block's y-coordinate
 
         for (let y = 0; y < 16; y++)                        // Iterate over y-coordinates from 0 to 15
             if (chunk.blocks[baseIndex + y] != null)        // Check if the block at this index is not null
-                highest_y = y;                              // Update the highest y-coordinate
+                highest_y = y;                              // Update the highest y-coordinate                      
 
-        return [-31, -highest_y - delta, -31];              // Return the coordinates of the highest block
+        return [-x, -highest_y - delta, -z];              // Return the coordinates of the highest block
     }
 
     // called every frame by webGL manager to render the scene
@@ -145,12 +184,13 @@ export class Main extends Scene {
         if (!context.scratchpad.controls) {
             this.children.push(context.scratchpad.controls = new defs.Movement_Controls);
             this.program_state = program_state;                                                 // store ref to program state
-            program_state.set_camera(Mat4.translation(...this.get_spawn_point(2)));             // set player position
+            program_state.set_camera(Mat4.translation(...this.get_coordinates(2)));             // set player position
             program_state.projection_transform = Mat4.perspective(                              // set camera as perspective
                 Math.PI / 4, 
                 context.width / context.height, 
                 1, 256);
             program_state.lights = [new Light(vec4(0, 20, 0, 1), color(1, 1, 1, 1), 10000)];    // create lights
+            console.log("camera position:", program_state.camera_transform);
         }
 
         // frame constants
@@ -175,8 +215,18 @@ export class Main extends Scene {
             }
         }
 
+        // pull camera coordinates from camera_transform
+        this.camera_x = program_state.camera_transform[0][3];
+        this.camera_z = program_state.camera_transform[2][3];
+        // console.log("camera x,z:", camera_x, camera_z);
+
+        // set player position based on terrain
+        let [x, y, z] = this.get_coordinates(2, this.camera_x, this.camera_z);
+        // console.log(this.get_coordinates(2, camera_x, camera_z))
+        program_state.set_camera(Mat4.translation(x, y, z));
+
         // draw spawn point
-        // const [x, y, z] = this.get_spawn_point(1);
+        // const [x, y, z] = this.get_coordinates(1);
         // model_transform = Mat4.translation(-x, -y, -z);
         // this.shapes.cube.draw(context, program_state, model_transform, this.materials.phong);
     }
