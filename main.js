@@ -1,5 +1,6 @@
 import {defs, tiny} from './examples/common.js';
 import { Chunk_Manager, Perlin_Noise } from './world_gen.js';
+import { CustomMovementControls } from './controls.js';
 
 const {
     Vector, Vector3, vec, vec3, vec4, color, hex_color, Shader, Matrix, Mat4, Light, Shape, Material, Scene, Texture,
@@ -48,39 +49,6 @@ class Cube extends Shape {
     }
 }
 
-class CustomMovementControls extends defs.Movement_Controls {
-    constructor() {
-        super();
-        // Disable rolling by default
-        this.roll = 0;
-
-        // Unfreeze mouse look around by default
-        this.look_around_locked = false; // Set to false to allow looking around
-    }
-
-    // Override the display method to modify behavior
-    display(context, graphics_state, dt = graphics_state.animation_delta_time / 1000) {
-        // Prevent rolling left or right
-        this.roll = 0;
-
-        // Call the super class display method
-        super.display(context, graphics_state, dt);
-    }
-
-    // Override the first_person_flyaround method to restrict up/down movement
-    first_person_flyaround(radians_per_frame, meters_per_frame, leeway = 70) {
-        // Prevent moving up and down
-        this.thrust[1] = 0;
-
-        this.mouse.from_center[1] = Math.max(Math.min(this.mouse.from_center[1], leeway/2), -leeway/2);
-
-
-        // Call the super class method
-        super.first_person_flyaround(radians_per_frame, meters_per_frame, leeway);
-    }
-
-}
-
 export class Main extends Scene {
     constructor() {
         super();
@@ -109,7 +77,7 @@ export class Main extends Scene {
             sky_night: color(0, 0, 0, 1),
         };
 
-        this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
+        this.program_state;
         this.perlin = new Perlin_Noise();
         this.Chunk_Manager = new Chunk_Manager(this.perlin);
         this.Chunk_Manager.add_chunk(0, 0);
@@ -117,90 +85,99 @@ export class Main extends Scene {
         this.Chunk_Manager.add_chunk(1, 0);
         this.Chunk_Manager.add_chunk(1, 1);
 
-        // console.log(this.shapes.cube);
     }
 
     make_control_panel() {
         // press t to regenerate the world
         this.key_triggered_button("new terrain", ["t"], () => {
-            this.perlin.seed();                         // randomly create new perlin permutation
-            this.Chunk_Manager.generate_chunks();       // regenerate world w/ new noise map
-            this.Chunk_Manager.update_chunk_meshes();   // update surface area mesh
+            this.perlin.seed();                                                             // randomly create new perlin permutation
+            this.Chunk_Manager.generate_chunks();                                           // regenerate world w/ new noise map
+            this.Chunk_Manager.update_chunk_meshes();                                       // update surface area mesh
+            this.program_state.set_camera(Mat4.translation(...this.get_spawn_point(2)));    // reset player position
+        });
+
+        this.new_line(); this.new_line();
+
+        // create input controls
+        this.control_panel.innerHTML += "write coordinate as 'x y z' <br>";
+        const xyz_input = this.control_panel.appendChild(document.createElement("input"));
+        this.new_line();
+        xyz_input.setAttribute("type", "text");
+        xyz_input.setAttribute("placeholder", "x y z");
+        // handle placing block
+        this.key_triggered_button("place block", ["p"], () => {
+            const coords = xyz_input.value.split(" ").map(x => parseInt(x));
+            if (coords.length == 3) {
+                this.Chunk_Manager.place_block(...coords);
+                return;
+            }
+            console.log("incorrect coordinates dimensions");
+        });
+        // handle deleting block
+        this.key_triggered_button("delete block", ["o"], () => {
+            const coords = xyz_input.value.split(" ").map(x => parseInt(x));
+            if (coords.length == 3) {
+                this.Chunk_Manager.delete_block(...coords);
+                return;
+            }
+            console.log("incorrect coordinates dimensions");
         });
     }
 
-    set_camera_above_block() {
-        // Find a suitable block's position
-        let blockPosition = this.find_starting_block_position();
-        let cameraHeightAboveBlock = 10; // Adjust as needed
-    
-        // Return the calculated camera position
-        return [blockPosition[0], blockPosition[1] + cameraHeightAboveBlock, blockPosition[2]];
-    }
-    
-    find_starting_block_position() {
-         // Access Chunk 0,0
-    const chunk = this.Chunk_Manager.chunks.get("0,0");
+    // spawn the player at (31, y*, 31) where y* is the top most block at x,z = 31 plus an optional height delta
+    // note camera needs inverse coords so need to make everything negative
+    get_spawn_point(delta = 0) {
+        const chunk = this.Chunk_Manager.chunks.get("0,0"); // Access Chunk 0,0
+        const baseIndex = 16368;                            // Base index for position (31, y, 31)
+        let highest_y;                                      // Initialize the highest block's y-coordinate
 
-    // Base index for position (31, y, 31)
-    const baseIndex = 31 * 512 + 31 * 16;
+        for (let y = 0; y < 16; y++)                        // Iterate over y-coordinates from 0 to 15
+            if (chunk.blocks[baseIndex + y] != null)        // Check if the block at this index is not null
+                highest_y = y;                              // Update the highest y-coordinate
 
-    // Initialize the highest block's y-coordinate
-    let highestY = -1;
-
-    // Iterate over y-coordinates from 0 to 15
-    for (let y = 0; y <= 15; y++) {
-        // Calculate the index in the blocks array
-        let index = baseIndex + y;
-
-        // Check if the block at this index is not null
-        if (chunk.blocks[index] !== null) {
-            // Update the highest y-coordinate
-            highestY = y;
-        }
+        return [-31, -highest_y - delta, -31];              // Return the coordinates of the highest block
     }
 
-    // If no valid block is found, return a default position
-    if (highestY === -1) {
-        // Return a default position if needed
-        return [-31, 0, -31]; // Example default position
-    }
-
-    // Return the coordinates of the highest block
-    return [-31, -highestY - 5, -31];
-    }
-    
-
+    // called every frame by webGL manager to render the scene
     display(context, program_state) {
-        // grab gl pointer to handle sky color
-        const gl = context.context;
 
-        // create initial camera & lights on first frame
+        // on first frame...
         if (!context.scratchpad.controls) {
-            this.children.push(context.scratchpad.controls = new CustomMovementControls());
-            let [x_initial, y_initial, z_initial] = this.set_camera_above_block();
-            program_state.set_camera(Mat4.translation(x_initial, y_initial, z_initial));
-            program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 1, 256);
-            program_state.lights = [new Light(vec4(0, 20, 0, 1), color(1, 1, 1, 1), 10000)];
+            this.children.push(context.scratchpad.controls = new defs.Movement_Controls);
+            this.program_state = program_state;                                                 // store ref to program state
+            program_state.set_camera(Mat4.translation(...this.get_spawn_point(2)));             // set player position
+            program_state.projection_transform = Mat4.perspective(                              // set camera as perspective
+                Math.PI / 4, 
+                context.width / context.height, 
+                1, 256);
+            program_state.lights = [new Light(vec4(0, 20, 0, 1), color(1, 1, 1, 1), 10000)];    // create lights
         }
 
-        let model_transform;
-        const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
+        // frame constants
+        const gl = context.context;                                                             // grab gl pointer to handle sky color
+        let model_transform;                                                                    // reuse for block renders
+        const t = program_state.animation_time / 1000;                                          // time units
+        const dt = program_state.animation_delta_time / 1000;
 
         // handle sky
-        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                      // 60s cycle between [0,1]
-        const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);   // lin interp between night/day
-        gl.clearColor.apply(gl, sky_color);
+        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                          // 60s cycle between [0,1]
+        const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);       // lin interp between night/day
+        gl.clearColor.apply(gl, sky_color);                                                     // set background draw color
 
         // draw blocks
         for (const c of this.Chunk_Manager.chunks.values()) {
             for (const coord of c.coords) {
-                model_transform = Mat4.identity().times(Mat4.translation(coord.x,coord.y,coord.z));
+                model_transform = Mat4.translation(coord.x,coord.y,coord.z);
                 if (coord.t == 1)
                     this.shapes.cube.draw(context, program_state, model_transform, this.materials.grass);
                 if (coord.t == 2)
                     this.shapes.cube.draw(context, program_state, model_transform, this.materials.stone);
             }
         }
+
+        // draw spawn point
+        // const [x, y, z] = this.get_spawn_point(1);
+        // model_transform = Mat4.translation(-x, -y, -z);
+        // this.shapes.cube.draw(context, program_state, model_transform, this.materials.phong);
     }
 }
