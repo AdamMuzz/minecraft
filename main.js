@@ -201,7 +201,6 @@ export class Main extends Scene {
 
     // called every frame by webGL manager to render the scene
     display(context, program_state) {
-
         // on first frame...
         if (!context.scratchpad.controls) {
             this.children.push(context.scratchpad.controls = new CustomMovementControls());
@@ -214,8 +213,9 @@ export class Main extends Scene {
             program_state.lights = [new Light(vec4(0, 20, 0, 1), color(1, 1, 1, 1), 10000)];    // create lights
             // console.log("camera position:", program_state.camera_transform);
             this.audio = new Audio("assets/background_song.mp3");
+            console.log(this.audio)
             this.audio.loop = true;
-            this.audio.volume = 0.4;
+            this.audio.volume = 0.5;
             this.audio.play();
         }
 
@@ -233,10 +233,10 @@ export class Main extends Scene {
         player_transform = player_transform.times(Mat4.translation(program_state.camera_transform[0][3], program_state.camera_transform[1][3], program_state.camera_transform[2][3]));
 
         var moon_transform = player_transform;
-        moon_transform = moon_transform.times(Mat4.rotation(-2 * Math.PI * (t + 15) / 60, 0, 0, 1)).times(Mat4.translation(40, 0, 0));
+        moon_transform = moon_transform.times(Mat4.rotation(-2 * Math.PI * (t + 15) / 60, 0, 0, 1)).times(Mat4.translation(60, 0, 0));
 
         var sun_transform = player_transform;
-        sun_transform = sun_transform.times(Mat4.rotation(-2 * Math.PI * (t +15) / 60, 0, 0, 1)).times(Mat4.translation(-40, 0, 0));
+        sun_transform = sun_transform.times(Mat4.rotation(-2 * Math.PI * (t +15) / 60, 0, 0, 1)).times(Mat4.translation(-60, 0, 0));
 
         if (sky_time > 0.4) {
             let hex = Math.round(sky_time * 255);
