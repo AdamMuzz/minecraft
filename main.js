@@ -75,11 +75,19 @@ export class Main extends Scene {
             }),
             sky_day: color(124/255, 173/255, 255/255, 1),
             sky_night: color(0, 0, 0, 1),
+            hand: new Material(new defs.Phong_Shader(), {
+                ambient: 1, diffusivity: 0.5, color: hex_color('#a97d64')
+            }),
         };
 
         this.program_state;
         this.camera_x;
         this.camera_z;
+        this.horizontalRotationSpeed = 0;
+        this.verticalRotationSpeed = 0;
+        this.cumulative_horizontal_angle = 0;
+        this.cumulative_vertical_angle = 0;
+
 
         this.perlin = new Perlin_Noise();
         this.Chunk_Manager = new Chunk_Manager(this.perlin);
@@ -182,7 +190,7 @@ export class Main extends Scene {
 
         // on first frame...
         if (!context.scratchpad.controls) {
-            this.children.push(context.scratchpad.controls = new defs.Movement_Controls);
+            this.children.push(context.scratchpad.controls = new CustomMovementControls());
             this.program_state = program_state;                                                 // store ref to program state
             program_state.set_camera(Mat4.translation(...this.get_coordinates(2)));             // set player position
             program_state.projection_transform = Mat4.perspective(                              // set camera as perspective
@@ -215,19 +223,83 @@ export class Main extends Scene {
             }
         }
 
-        // pull camera coordinates from camera_transform
+        // Access mouseX and mouseY from CustomMovementControls
+        const controls = context.scratchpad.controls;
+        const mouseX = controls.mouseX;
+        const mouseY = controls.mouseY;
+        
+        // Define edge thresholds 
+        const edgeThreshold = 400;
+        const topEdge = 250;
+        console.log(mouseY);
+        // Pull camera coordinates from camera_transform
         this.camera_x = program_state.camera_transform[0][3];
         this.camera_z = program_state.camera_transform[2][3];
-        // console.log("camera x,z:", camera_x, camera_z);
-
-        // set player position based on terrain
         let [x, y, z] = this.get_coordinates(2, this.camera_x, this.camera_z);
-        // console.log(this.get_coordinates(2, camera_x, camera_z))
-        program_state.set_camera(Mat4.translation(x, y, z));
+        // Reset rotation speeds when mouse is not near edges
+        if (mouseX < -edgeThreshold) {
+            this.horizontalRotationSpeed -= 200; 
+        } else if (mouseX > edgeThreshold) {
+            this.horizontalRotationSpeed += 200; 
+        } else {
+            this.horizontalRotationSpeed = 0; // Reset if not near horizontal edges
+        }
 
-        // draw spawn point
-        // const [x, y, z] = this.get_coordinates(1);
-        // model_transform = Mat4.translation(-x, -y, -z);
-        // this.shapes.cube.draw(context, program_state, model_transform, this.materials.phong);
+        if (mouseY < -topEdge) {
+            this.verticalRotationSpeed = Math.max(this.verticalRotationSpeed - 200, -3800);
+        } else if (mouseY > topEdge) {
+            this.verticalRotationSpeed = Math.min(this.verticalRotationSpeed + 200, 3800);
+        } else {
+            this.verticalRotationSpeed = 0; // Reset if not near vertical edges
+        }
+
+        // Calculate rotation angles
+        const rotation_sensitivity = 0.00002; 
+        this.cumulative_horizontal_angle += this.horizontalRotationSpeed * rotation_sensitivity;
+        this.cumulative_vertical_angle += this.verticalRotationSpeed * rotation_sensitivity;
+
+        // Clamp the vertical angle to prevent flipping over
+        this.cumulative_vertical_angle = Math.max(Math.min(this.cumulative_vertical_angle, Math.PI/2), -Math.PI/2);
+
+        // Construct the camera orientation
+        let camera_transform = Mat4.identity()
+            .times(Mat4.rotation(-this.cumulative_vertical_angle, -1, 0, 0)) 
+            .times(Mat4.rotation(-this.cumulative_horizontal_angle, 0, -1, 0)) 
+            .times(Mat4.translation(x, y, z)); 
+
+
+            program_state.set_camera(camera_transform);
+        // Calculate the position for the cube ("hand")
+        const handDistance = 1.3; 
+        const handOffset = vec3(0.5, -0.5, -handDistance); 
+
+        const rotation_angle = Math.PI / 3; 
+
+        // First, calculate the inverse of the camera transform
+        let inverse_camera_transform = Mat4.inverse(camera_transform);
+
+        // Then, apply the hand translation to the inverse camera transform
+        let hand_transform = inverse_camera_transform
+            .times(Mat4.translation(...handOffset))
+            .times(Mat4.scale(0.25,0.25,0.25))
+            .times(Mat4.rotation(rotation_angle, 0, 0, 1))
+            .times(Mat4.rotation(Math.PI/6, 0, -1, 0));
+
+        // Draw the cube
+        this.shapes.cube.draw(context, program_state, hand_transform, this.materials.hand);
+
+        // Calculate the transform for the second cube, placed behind the first in the z-direction
+        let hand_transform_second = hand_transform
+        .times(Mat4.translation(0, 0, -0.6)); // Move it behind by twice the depth to avoid overlapping
+
+        // Draw the second cube
+        this.shapes.cube.draw(context, program_state, hand_transform_second, this.materials.hand);
+        // Calculate the transform for the third cube, placed behind the second in the z-direction
+        let hand_transform_third = hand_transform_second
+        .times(Mat4.translation(0, 0, -0.6)); 
+        this.shapes.cube.draw(context, program_state, hand_transform_third, this.materials.hand);
+
+        // Set the camera
+        program_state.set_camera(camera_transform);
     }
 }
