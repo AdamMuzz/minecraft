@@ -1,5 +1,6 @@
 import {defs, tiny} from './examples/common.js';
 import { Chunk_Manager, Perlin_Noise } from './world_gen.js';
+import { CustomMovementControls } from './controls.js';
 
 const {
     Vector, Vector3, vec, vec3, vec4, color, hex_color, Shader, Matrix, Mat4, Light, Shape, Material, Scene, Texture,
@@ -48,83 +49,6 @@ class Cube extends Shape {
     }
 }
 
-class CustomMovementControls extends defs.Movement_Controls {
-    constructor() {
-        super();
-        // Disable rolling by default
-        this.roll = 0;
-
-        // Unfreeze mouse look around by default
-        this.look_around_locked = false; // Set to false to allow looking around
-        this.speed_multiplier = 0.25;  // Normal speed
-        this.sprint_speed_multiplier = 0.7;  // Sprinting speed
-
-        // Add key event listeners for sprinting
-        this.enable_sprinting();
-    }
-
-    enable_sprinting() {
-        // Handle keydown event for Shift key
-        document.addEventListener('keydown', (event) => {
-            if (event.shiftKey) {
-                this.speed_multiplier = this.sprint_speed_multiplier;
-            }
-        });
-
-        // Handle keyup event for Shift key
-        document.addEventListener('keyup', (event) => {
-            if (event.key === 'Shift') {
-                this.speed_multiplier = 0.25;  // Reset to normal speed
-            }
-        });
-    }
-
-    // Override the display method to modify behavior
-    display(context, graphics_state, dt = graphics_state.animation_delta_time / 1000) {
-        // Prevent rolling left or right
-        this.roll = 0;
-
-        // Call the super class display method
-        super.display(context, graphics_state, dt);
-    }
-
-    // Override the first_person_flyaround method to restrict up/down movement
-    first_person_flyaround(radians_per_frame, meters_per_frame, leeway = 70) {
-        // Prevent moving up and down
-        this.thrust[1] = 0;
-
-        this.mouse.from_center[1] = Math.max(Math.min(this.mouse.from_center[1], leeway/2), -leeway/2);
-
-
-        // Call the super class method
-        super.first_person_flyaround(radians_per_frame, meters_per_frame, leeway);
-    }
-    make_control_panel(){
-        this.control_panel.innerHTML += "Click and drag the scene to spin your viewpoint around it.<br>";
-        this.live_string(box => {
-            box.textContent = "- Position: " + this.pos[0].toFixed(2) + ", " + this.pos[1].toFixed(2)
-            + ", " + this.pos[2].toFixed(2)
-        });
-        this.new_line();
-        this.live_string(box => {
-            box.textContent = "- Facing: " + ((this.z_axis[0] > 0 ? "West " : "East ")
-            + (this.z_axis[1] > 0 ? "Down " : "Up ") + (this.z_axis[2] > 0 ? "North" : "South"))
-        });
-        this.new_line();
-        this.new_line();
-
-        this.key_triggered_button("Up", [" "], () => this.thrust[1] = -1, undefined, () => this.thrust[1] = 0);
-        this.key_triggered_button("Forward", ["w"], () => this.thrust[2] = 1, undefined, () => this.thrust[2] = 0);
-        this.new_line();
-        this.key_triggered_button("Left", ["a"], () => this.thrust[0] = 1, undefined, () => this.thrust[0] = 0);
-        this.key_triggered_button("Back", ["s"], () => this.thrust[2] = -1, undefined, () => this.thrust[2] = 0);
-        this.key_triggered_button("Right", ["d"], () => this.thrust[0] = -1, undefined, () => this.thrust[0] = 0);
-        this.key_triggered_button("Sprint", ["Shift"], () => this.toggle_sprint(), "#8B8885");
-        this.new_line();
-    }
-
-}
-
 export class Main extends Scene {
     constructor() {
         super();
@@ -153,7 +77,15 @@ export class Main extends Scene {
             sky_night: color(0, 0, 0, 1),
         };
 
-        this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
+        this.program_state;
+        this.camera_x;
+        this.camera_z;
+        this.horizontalRotationSpeed = 0;
+        this.verticalRotationSpeed = 0;
+        this.cumulative_horizontal_angle = 0;
+        this.cumulative_vertical_angle = 0;
+
+
         this.perlin = new Perlin_Noise();
         this.Chunk_Manager = new Chunk_Manager(this.perlin);
         this.Chunk_Manager.add_chunk(0, 0);
@@ -161,90 +93,178 @@ export class Main extends Scene {
         this.Chunk_Manager.add_chunk(1, 0);
         this.Chunk_Manager.add_chunk(1, 1);
 
-        // console.log(this.shapes.cube);
     }
 
     make_control_panel() {
         // press t to regenerate the world
         this.key_triggered_button("new terrain", ["t"], () => {
-            this.perlin.seed();                         // randomly create new perlin permutation
-            this.Chunk_Manager.generate_chunks();       // regenerate world w/ new noise map
-            this.Chunk_Manager.update_chunk_meshes();   // update surface area mesh
+            this.perlin.seed();                                                             // randomly create new perlin permutation
+            this.Chunk_Manager.generate_chunks();                                           // regenerate world w/ new noise map
+            this.Chunk_Manager.update_chunk_meshes();                                       // update surface area mesh
+            this.program_state.set_camera(Mat4.translation(...this.get_coordinates(2, this.camera_x, this.camera_z)));    // set position
+        });
+
+        this.new_line(); this.new_line();
+
+        // create input controls
+        this.control_panel.innerHTML += "write coordinate as 'x y z' <br>";
+        const xyz_input = this.control_panel.appendChild(document.createElement("input"));
+        this.new_line();
+        xyz_input.setAttribute("type", "text");
+        xyz_input.setAttribute("placeholder", "x y z");
+        // handle placing block
+        this.key_triggered_button("place block", ["p"], () => {
+            const coords = xyz_input.value.split(" ").map(x => parseInt(x));
+            if (coords.length == 3) {
+                this.Chunk_Manager.place_block(...coords);
+                return;
+            }
+            console.log("incorrect coordinates dimensions");
+        });
+        // handle deleting block
+        this.key_triggered_button("delete block", ["o"], () => {
+            const coords = xyz_input.value.split(" ").map(x => parseInt(x));
+            if (coords.length == 3) {
+                this.Chunk_Manager.delete_block(...coords);
+                return;
+            }
+            console.log("incorrect coordinates dimensions");
         });
     }
 
-    set_camera_above_block() {
-        // Find a suitable block's position
-        let blockPosition = this.find_starting_block_position();
-        let cameraHeightAboveBlock = 10; // Adjust as needed
-    
-        // Return the calculated camera position
-        return [blockPosition[0], blockPosition[1] + cameraHeightAboveBlock, blockPosition[2]];
-    }
-    
-    find_starting_block_position() {
-         // Access Chunk 0,0
-        const chunk = this.Chunk_Manager.chunks.get("0,0");
+    // spawn the player at (31, y*, 31) where y* is the top most block at x,z = 31 plus an optional height delta
+    // note camera needs inverse coords so need to make everything negative
+    get_coordinates(delta = 0, x = 31, z = 31) {
 
-        // Base index for position (31, y, 31)
-        const baseIndex = 16368;
+        // chunk bounds: 0 < x < 64, 0 < z < 64
 
-        // Initialize the highest block's y-coordinate
-        let highestY = -1;
+        // find which chunk to traverse
+        let chunk_x = Math.floor(x/32);
+        let chunk_z = Math.floor(z/32);
 
-        // Iterate over y-coordinates from 0 to 15
-        for (let y = 0; y <= 15; y++) {
-            // Calculate the index in the blocks array
-            let index = baseIndex + y;
+        // convert actual coordinate to chunk indices
+        let i_x = Math.floor(x % 32);
+        let i_z = Math.floor(z % 32);
 
-            // Check if the block at this index is not null
-            if (chunk.blocks[index] !== null) {
-                // Update the highest y-coordinate
-                highestY = y;
-            }
+        // if camera coordinates are out of bounds (for error prevention in chunk out-of-bounds access)
+        if (x <= 0) {
+            chunk_x = 0;
+            i_x = 0;
         }
+        if (z <= 0) {
+            chunk_z = 0;
+            i_z = 0;
+        }
+        if (x >= 64) {
+            chunk_x = 1;
+            i_x = 31;
+        }
+        if (z >= 64) {
+            chunk_z = 1;
+            i_z = 31;
+        }
+        // console.log("chunk:", chunk_coords, ", i_x, i_z:", i_x, i_z);
 
-    // If no valid block is found, return a default position
-    if (highestY === -1) {
-        // Return a default position if needed
-        return [-31, 0, -31]; // Example default position
+        // chunk coordinates
+        const chunk_coords = chunk_x.toString() + ',' + chunk_z.toString();
+        
+        const chunk = this.Chunk_Manager.chunks.get(chunk_coords); // Access Chunk 0,0
+        
+        // calculate index given indices
+        const baseIndex = i_x * (32*16) + i_z * 16;                 // Base index for position (i_x, _, i_z)
+
+        let highest_y;                                      // Initialize the highest block's y-coordinate
+
+        for (let y = 0; y < 16; y++)                        // Iterate over y-coordinates from 0 to 15
+            if (chunk.blocks[baseIndex + y] != null)        // Check if the block at this index is not null
+                highest_y = y;                              // Update the highest y-coordinate                      
+
+        return [-x, -highest_y - delta, -z];              // Return the coordinates of the highest block
     }
 
-    // Return the coordinates of the highest block
-    return [-31, -highestY - 5, -31];
-    }
-    
-
+    // called every frame by webGL manager to render the scene
     display(context, program_state) {
-        // grab gl pointer to handle sky color
-        const gl = context.context;
 
-        // create initial camera & lights on first frame
+        // on first frame...
         if (!context.scratchpad.controls) {
             this.children.push(context.scratchpad.controls = new CustomMovementControls());
-            let [x_initial, y_initial, z_initial] = this.set_camera_above_block();
-            program_state.set_camera(Mat4.translation(x_initial, y_initial, z_initial));
-            program_state.projection_transform = Mat4.perspective(Math.PI / 4, context.width / context.height, 1, 256);
-            program_state.lights = [new Light(vec4(0, 20, 0, 1), color(1, 1, 1, 1), 10000)];
+            this.program_state = program_state;                                                 // store ref to program state
+            program_state.set_camera(Mat4.translation(...this.get_coordinates(2)));             // set player position
+            program_state.projection_transform = Mat4.perspective(                              // set camera as perspective
+                Math.PI / 4, 
+                context.width / context.height, 
+                1, 256);
+            program_state.lights = [new Light(vec4(0, 20, 0, 1), color(1, 1, 1, 1), 10000)];    // create lights
+            console.log("camera position:", program_state.camera_transform);
         }
 
-        let model_transform;
-        const t = program_state.animation_time / 1000, dt = program_state.animation_delta_time / 1000;
+        // frame constants
+        const gl = context.context;                                                             // grab gl pointer to handle sky color
+        let model_transform;                                                                    // reuse for block renders
+        const t = program_state.animation_time / 1000;                                          // time units
+        const dt = program_state.animation_delta_time / 1000;
 
         // handle sky
-        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                      // 60s cycle between [0,1]
-        const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);   // lin interp between night/day
-        gl.clearColor.apply(gl, sky_color);
+        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                          // 60s cycle between [0,1]
+        const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);       // lin interp between night/day
+        gl.clearColor.apply(gl, sky_color);                                                     // set background draw color
 
         // draw blocks
         for (const c of this.Chunk_Manager.chunks.values()) {
             for (const coord of c.coords) {
-                model_transform = Mat4.identity().times(Mat4.translation(coord.x,coord.y,coord.z));
+                model_transform = Mat4.translation(coord.x,coord.y,coord.z);
                 if (coord.t == 1)
                     this.shapes.cube.draw(context, program_state, model_transform, this.materials.grass);
                 if (coord.t == 2)
                     this.shapes.cube.draw(context, program_state, model_transform, this.materials.stone);
             }
         }
+
+    // Access mouseX and mouseY from CustomMovementControls
+    const controls = context.scratchpad.controls;
+    const mouseX = controls.mouseX;
+    const mouseY = controls.mouseY;
+    
+    // Define edge thresholds (e.g., 10% of screen width)
+    const edgeThreshold = 400;
+    const topEdge = 250;
+    console.log(mouseY);
+        // Pull camera coordinates from camera_transform
+        this.camera_x = program_state.camera_transform[0][3];
+        this.camera_z = program_state.camera_transform[2][3];
+        let [x, y, z] = this.get_coordinates(2, this.camera_x, this.camera_z);
+   // Reset rotation speeds when mouse is not near edges
+if (mouseX < -edgeThreshold) {
+    this.horizontalRotationSpeed -= 200; // Left edge
+} else if (mouseX > edgeThreshold) {
+    this.horizontalRotationSpeed += 200; // Right edge
+} else {
+    this.horizontalRotationSpeed = 0; // Reset if not near horizontal edges
+}
+
+// Apply similar logic for vertical rotation
+if (mouseY < -topEdge) {
+    this.verticalRotationSpeed = Math.max(this.verticalRotationSpeed - 200, -3800);
+} else if (mouseY > topEdge) {
+    this.verticalRotationSpeed = Math.min(this.verticalRotationSpeed + 200, 3800);
+} else {
+    this.verticalRotationSpeed = 0; // Reset if not near vertical edges
+}
+
+// Calculate rotation angles
+const rotation_sensitivity = 0.00002; // Adjust this value as needed
+this.cumulative_horizontal_angle += this.horizontalRotationSpeed * rotation_sensitivity;
+this.cumulative_vertical_angle += this.verticalRotationSpeed * rotation_sensitivity;
+
+// Clamp the vertical angle to prevent flipping over
+this.cumulative_vertical_angle = Math.max(Math.min(this.cumulative_vertical_angle, Math.PI/2), -Math.PI/2);
+
+// Construct the camera orientation
+let camera_transform = Mat4.identity()
+    .times(Mat4.rotation(-this.cumulative_vertical_angle, -1, 0, 0)) // Rotate around X-axis
+    .times(Mat4.rotation(-this.cumulative_horizontal_angle, 0, -1, 0)) // Rotate around Y-axis
+    .times(Mat4.translation(x, y, z)); // Translate to the new position
+
+program_state.set_camera(camera_transform);
     }
 }
