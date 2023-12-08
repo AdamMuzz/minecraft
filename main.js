@@ -56,6 +56,9 @@ export class Main extends Scene {
         this.shapes = {
             cube: new Cube(),
             test: new Cube_Single_Strip(),
+            sun: new Cube(16),
+            moon: new Cube(16),
+            player: new Cube(),
         };
 
         this.materials = {
@@ -75,9 +78,18 @@ export class Main extends Scene {
             }),
             sky_day: color(124/255, 173/255, 255/255, 1),
             sky_night: color(0, 0, 0, 1),
+            sun: new Material(new defs.Phong_Shader(), {
+                ambient: .4, diffusivity: 1, color: hex_color("#f9d71c"),
+            }),
+            moon: new Material(new defs.Phong_Shader(), {
+                ambient: 0.2, diffusivity: 0.2, color: hex_color("#ffffff"),
+            }),
+            player: new Material(new defs.Phong_Shader(), {
+                ambient: 1, diffusivity: 1, color: hex_color("#aaaaaa"),
+            }),
             hand: new Material(new defs.Phong_Shader(), {
                 ambient: 1, diffusivity: 0.5, color: hex_color('#a97d64')
-            }),
+            })
         };
 
         this.program_state;
@@ -133,6 +145,8 @@ export class Main extends Scene {
             }
             console.log("incorrect coordinates dimensions");
         });
+        this.new_line();
+        this.key_triggered_button("Mute", ["m"], () => this.audio.muted = !this.audio.muted);
     }
 
     // spawn the player at (31, y*, 31) where y* is the top most block at x,z = 31 plus an optional height delta
@@ -198,19 +212,44 @@ export class Main extends Scene {
                 context.width / context.height, 
                 1, 256);
             program_state.lights = [new Light(vec4(0, 20, 0, 1), color(1, 1, 1, 1), 10000)];    // create lights
-            console.log("camera position:", program_state.camera_transform);
+            // console.log("camera position:", program_state.camera_transform);
+            this.audio = new Audio("assets/background_song.mp3");
+            this.audio.loop = true;
+            this.audio.volume = 0.4;
+            this.audio.play();
         }
 
         // frame constants
         const gl = context.context;                                                             // grab gl pointer to handle sky color
-        let model_transform;                                                                    // reuse for block renders
+        let model_transform = Mat4.identity();                                                  // reuse for block renders
         const t = program_state.animation_time / 1000;                                          // time units
         const dt = program_state.animation_delta_time / 1000;
 
         // handle sky
-        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                          // 60s cycle between [0,1]
+        const sky_time = 0.5 * Math.cos(2 * Math.PI * t / 60.0) + 0.5;                       // 60s cycle between [0,1]
         const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);       // lin interp between night/day
-        gl.clearColor.apply(gl, sky_color);                                                     // set background draw color
+
+        var player_transform = model_transform;
+        player_transform = player_transform.times(Mat4.translation(program_state.camera_transform[0][3], program_state.camera_transform[1][3], program_state.camera_transform[2][3]));
+
+        var moon_transform = player_transform;
+        moon_transform = moon_transform.times(Mat4.rotation(-2 * Math.PI * (t + 15) / 60, 0, 0, 1)).times(Mat4.translation(40, 0, 0));
+
+        var sun_transform = player_transform;
+        sun_transform = sun_transform.times(Mat4.rotation(-2 * Math.PI * (t +15) / 60, 0, 0, 1)).times(Mat4.translation(-40, 0, 0));
+
+        if (sky_time > 0.4) {
+            let hex = Math.round(sky_time * 255);
+            let hex_code = `#${(hex << 16 | hex << 8 | hex).toString(16).padStart(6, '0')}`
+            program_state.lights = [new Light(vec(sun_transform[0][3],sun_transform[1][3],sun_transform[2][3],1), hex_color(hex_code), 100000)]; 
+        } else {
+            program_state.lights = [new Light(vec(sun_transform[0][3],sun_transform[1][3],sun_transform[2][3],1), color(0,0,0,0), 100000)];       // create lights
+        }
+        gl.clearColor.apply(gl, sky_color);                                                                                                         // set background draw color
+
+        this.shapes.player.draw(context, program_state, player_transform, this.materials.player);
+        this.shapes.moon.draw(context, program_state, moon_transform, this.materials.moon);
+        this.shapes.sun.draw(context, program_state, sun_transform, this.materials.sun);
 
         // draw blocks
         for (const c of this.Chunk_Manager.chunks.values()) {
