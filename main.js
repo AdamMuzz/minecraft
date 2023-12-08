@@ -212,8 +212,6 @@ export class Main extends Scene {
         const sky_color = this.materials.sky_night.mix(this.materials.sky_day, sky_time);       // lin interp between night/day
         gl.clearColor.apply(gl, sky_color);                                                     // set background draw color
 
-        
-
         // draw blocks
         for (const c of this.Chunk_Manager.chunks.values()) {
             for (const coord of c.coords) {
@@ -230,7 +228,7 @@ export class Main extends Scene {
         const mouseX = controls.mouseX;
         const mouseY = controls.mouseY;
         
-        // Define edge thresholds (e.g., 10% of screen width)
+        // Define edge thresholds 
         const edgeThreshold = 400;
         const topEdge = 250;
         console.log(mouseY);
@@ -240,14 +238,13 @@ export class Main extends Scene {
         let [x, y, z] = this.get_coordinates(2, this.camera_x, this.camera_z);
         // Reset rotation speeds when mouse is not near edges
         if (mouseX < -edgeThreshold) {
-            this.horizontalRotationSpeed -= 200; // Left edge
+            this.horizontalRotationSpeed -= 200; 
         } else if (mouseX > edgeThreshold) {
-            this.horizontalRotationSpeed += 200; // Right edge
+            this.horizontalRotationSpeed += 200; 
         } else {
             this.horizontalRotationSpeed = 0; // Reset if not near horizontal edges
         }
 
-        // Apply similar logic for vertical rotation
         if (mouseY < -topEdge) {
             this.verticalRotationSpeed = Math.max(this.verticalRotationSpeed - 200, -3800);
         } else if (mouseY > topEdge) {
@@ -257,7 +254,7 @@ export class Main extends Scene {
         }
 
         // Calculate rotation angles
-        const rotation_sensitivity = 0.00002; // Adjust this value as needed
+        const rotation_sensitivity = 0.00002; 
         this.cumulative_horizontal_angle += this.horizontalRotationSpeed * rotation_sensitivity;
         this.cumulative_vertical_angle += this.verticalRotationSpeed * rotation_sensitivity;
 
@@ -266,17 +263,17 @@ export class Main extends Scene {
 
         // Construct the camera orientation
         let camera_transform = Mat4.identity()
-            .times(Mat4.rotation(-this.cumulative_vertical_angle, -1, 0, 0)) // Rotate around X-axis
-            .times(Mat4.rotation(-this.cumulative_horizontal_angle, 0, -1, 0)) // Rotate around Y-axis
-            .times(Mat4.translation(x, y, z)); // Translate to the new position
+            .times(Mat4.rotation(-this.cumulative_vertical_angle, -1, 0, 0)) 
+            .times(Mat4.rotation(-this.cumulative_horizontal_angle, 0, -1, 0)) 
+            .times(Mat4.translation(x, y, z)); 
 
 
             program_state.set_camera(camera_transform);
         // Calculate the position for the cube ("hand")
-        const handDistance = 1.3; // Distance of the cube from the camera
-        const handOffset = vec3(0.5, -0.5, -handDistance); // Adjust this offset to position the cube relative to camera
+        const handDistance = 1.3; 
+        const handOffset = vec3(0.5, -0.5, -handDistance); 
 
-        const rotation_angle = Math.PI / 3; // 45 degrees
+        const rotation_angle = Math.PI / 3; 
 
         // First, calculate the inverse of the camera transform
         let inverse_camera_transform = Mat4.inverse(camera_transform);
@@ -297,13 +294,10 @@ export class Main extends Scene {
 
         // Draw the second cube
         this.shapes.cube.draw(context, program_state, hand_transform_second, this.materials.hand);
-        // Calculate the transform for the second cube, placed behind the first in the z-direction
-        let hand_transform_third = hand_transform
-        .times(Mat4.translation(0, 0, -1)); // Move it behind by twice the depth to avoid overlapping
+        // Calculate the transform for the third cube, placed behind the second in the z-direction
+        let hand_transform_third = hand_transform_second
+        .times(Mat4.translation(0, 0, -0.6)); 
         this.shapes.cube.draw(context, program_state, hand_transform_third, this.materials.hand);
-
-        // Draw the second cube
-        this.shapes.cube.draw(context, program_state, hand_transform_second, this.materials.hand);
 
         // Set the camera
         program_state.set_camera(camera_transform);

@@ -3,7 +3,6 @@ import {defs, tiny} from './examples/common.js';
 export class CustomMovementControls extends defs.Movement_Controls {
     constructor() {
         super();
-
         this.mouseX = 0;
         this.mouseY = 0;
         this.total_x_rotation = 0;
@@ -46,6 +45,7 @@ export class CustomMovementControls extends defs.Movement_Controls {
         });
         this.canvas_width = canvas.width;
         this.canvas_height = canvas.height;
+
     }
 
     // Override the display method to modify behavior
@@ -63,7 +63,6 @@ export class CustomMovementControls extends defs.Movement_Controls {
         // Call the super class method
         super.first_person_flyaround(radians_per_frame, meters_per_frame, leeway);
     }
-    
     make_control_panel(){
         // this.control_panel.innerHTML += "Click and drag the scene to spin your viewpoint around it.<br>";
         this.live_string(box => {
