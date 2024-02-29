@@ -2,6 +2,8 @@
 
 This is the final project for CS 174A: introduction to 3D graphics. Our project is a simplified remake of the famous game Minecraft by Mojang Studios.
 
+A live demo can be found [here](https://adammuzz.github.io/minecraft/)
+
 ## Project Objective
 
 The primary objective of this project is to develop a basic but functional version of a Minecraft-esque environment, emphasizing the fundamentals of computer graphics. This includes understanding and implementing 3D rendering, user interactivity, collision detection, and random generation of landscapes similar to the original game.
